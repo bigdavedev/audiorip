@@ -55,6 +55,10 @@ static int get_track_addresses(int fd,
                                struct track_address* addresses,
                                int num_tracks,
                                int verbose);
+static int rip_track_to_file(int fd,
+                             struct track_address address,
+                             char const* filename,
+                             int verbose);
 
 int main(int argc, char* argv[])
 {
@@ -86,6 +90,8 @@ int main(int argc, char* argv[])
         spindown_and_close(cdrom_fd);
         return -1;
     }
+
+    rip_track_to_file(cdrom_fd, addresses[0], "track1.pcm", arguments.verbose);
 
     free(addresses);
     ioctl(cdrom_fd, CDROMSTOP);
@@ -195,6 +201,48 @@ static int get_track_addresses(int fd,
         if (verbose)
         {
             fprintf(stdout, "Track %d is %d frames long\n", i, addresses[i-1].end - addresses[i-1].start);
+        }
+    }
+    return 0;
+}
+
+static int rip_track_to_file(int fd,
+                             struct track_address address,
+                             char const* filename,
+                             int verbose)
+{
+    int const readframes = address.end - address.start;
+    unsigned char buffer[CD_FRAMES * CD_FRAMESIZE_RAW];
+    struct cdrom_read_audio read_audio =
+    {
+        .addr        = address.start,
+        .addr_format = CDROM_MSF,
+        .nframes     = CD_FRAMES,
+        .buf         = &buffer[0]
+    };
+
+    FILE* out = fopen(filename, "wb");
+    for (int chunk = 0; chunk < readframes; chunk += CD_FRAMES)
+    {
+        if (ioctl(fd, CDROMREADAUDIO, &read_audio) < 0)
+        {
+            fprintf(stderr, "Failed to read chunk\n");
+            fclose(out);
+            return -1;
+        }
+
+        fwrite(buffer, CD_FRAMES * CD_FRAMESIZE_RAW, (size_t)1, out);
+
+        read_audio.addr.msf.frame += read_audio.nframes;
+        if (read_audio.addr.msf.frame >= CD_FRAMES)
+        {
+            read_audio.addr.msf.second += read_audio.addr.msf.frame / CD_FRAMES;
+            read_audio.addr.msf.frame = read_audio.addr.msf.frame % CD_FRAMES;
+            if (read_audio.addr.msf.second >= 60)
+            {
+                read_audio.addr.msf.minute += read_audio.addr.msf.second / 60;
+                read_audio.addr.msf.second = read_audio.addr.msf.second % 60;
+            }
         }
     }
     return 0;
