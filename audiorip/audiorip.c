@@ -5,6 +5,7 @@
 #include <linux/cdrom.h>
 
 #include <stdio.h>
+#include <signal.h>
 
 /**
  * Stuff for argp
@@ -37,8 +38,12 @@ static struct argp argp = { options, parse_opt, NULL, doc };
 
 static int cdrom_fd = -1;
 
+static void sigint_handler(int sig);
+
 int main(int argc, char* argv[])
 {
+    signal(SIGINT, sigint_handler);
+
     struct arguments arguments;
     arguments.verbose = 0;
     arguments.quiet   = 0;
@@ -76,4 +81,10 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
     }
 
     return 0;
+}
+
+static void sigint_handler(int sig)
+{
+    ioctl(cdrom_fd, CDROMSTOP);
+    close(cdrom_fd);
 }
