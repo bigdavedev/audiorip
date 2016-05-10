@@ -39,6 +39,9 @@ static struct argp argp = { options, parse_opt, NULL, doc };
 static int cdrom_fd = -1;
 
 static void sigint_handler(int sig);
+static void spindown_and_close(int fd);
+
+static int get_num_tracks(int fd, int verbose);
 
 int main(int argc, char* argv[])
 {
@@ -57,6 +60,13 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Failed to open CDROM\n");
         return -1;
     }
+
+    ioctl(cdrom_fd, CDROMSTART);
+
+    /* Get table of contents header to determine number of tracks */
+    int num_tracks = get_num_tracks(cdrom_fd, arguments.verbose);
+
+    ioctl(cdrom_fd, CDROMSTOP);
     close(cdrom_fd);
     return 0;
 }
@@ -87,4 +97,28 @@ static void sigint_handler(int sig)
 {
     ioctl(cdrom_fd, CDROMSTOP);
     close(cdrom_fd);
+}
+
+static void spindown_and_close(int fd)
+{
+    ioctl(fd, CDROMSTOP);
+    close(fd);
+}
+
+static int get_num_tracks(int fd, int verbose)
+{
+    struct cdrom_tochdr toc_header;
+    if (ioctl(fd, CDROMREADTOCHDR, &toc_header) < 0)
+    {
+        fprintf(stderr, "Failed to read ToC header\n");
+        spindown_and_close(fd);
+        return -1;
+    }
+
+    if (verbose)
+    {
+        fprintf(stdout, "Number of tracks on CD: %d\n", toc_header.cdth_trk1);
+    }
+
+    return toc_header.cdth_trk1;
 }
