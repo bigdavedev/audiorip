@@ -41,6 +41,8 @@ struct track_address
 {
     int start;
     int end;
+
+    union cdrom_addr cdrom_addr;
 };
 
 static int cdrom_fd = -1;
@@ -181,17 +183,18 @@ static int get_track_addresses(int fd,
             return -1;
         }
 
-        addresses[i].start = current_track.cdte_addr.msf.frame
+        addresses[i-1].start = current_track.cdte_addr.msf.frame
                            + (current_track.cdte_addr.msf.minute * CD_FRAMES * 3600)
                            + (current_track.cdte_addr.msf.second * CD_FRAMES)
                            - CD_MSF_OFFSET;
-        addresses[i].end = next_track.cdte_addr.msf.frame
+        addresses[i-1].end = next_track.cdte_addr.msf.frame
                          + (next_track.cdte_addr.msf.minute * CD_FRAMES * 3600)
                          + (next_track.cdte_addr.msf.second * CD_FRAMES)
                          - CD_MSF_OFFSET;
+        addresses[i-1].cdrom_addr = current_track.cdte_addr;
         if (verbose)
         {
-            fprintf(stdout, "Track %d is %d frames long\n", i, addresses[i].end - addresses[i].start);
+            fprintf(stdout, "Track %d is %d frames long\n", i, addresses[i-1].end - addresses[i-1].start);
         }
     }
     return 0;
