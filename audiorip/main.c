@@ -113,4 +113,5 @@ static void sigint_handler(int sig)
 {
     ioctl(cdrom_fd, CDROMSTOP);
     close(cdrom_fd);
+    exit(sig);
 }
