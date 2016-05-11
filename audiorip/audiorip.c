@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <signal.h>
 
 /**
@@ -215,11 +216,16 @@ static int rip_track_to_file(int fd,
     unsigned char buffer[CD_FRAMES * CD_FRAMESIZE_RAW];
     struct cdrom_read_audio read_audio =
     {
-        .addr        = address.start,
+        .addr        = address.cdrom_addr,
         .addr_format = CDROM_MSF,
         .nframes     = CD_FRAMES,
         .buf         = &buffer[0]
     };
+
+    if (verbose)
+    {
+        fprintf(stdout, "Reading track from %d to %d\n", address.start, address.end);
+    }
 
     FILE* out = fopen(filename, "wb");
     for (int chunk = 0; chunk < readframes; chunk += CD_FRAMES)
@@ -227,11 +233,12 @@ static int rip_track_to_file(int fd,
         if (ioctl(fd, CDROMREADAUDIO, &read_audio) < 0)
         {
             fprintf(stderr, "Failed to read chunk\n");
+            fprintf(stderr, "%s\n", strerror(errno));
             fclose(out);
             return -1;
         }
 
-        fwrite(buffer, CD_FRAMES * CD_FRAMESIZE_RAW, (size_t)1, out);
+        fwrite(buffer, (size_t)CD_FRAMESIZE_RAW, (size_t)read_audio.nframes, out);
 
         read_audio.addr.msf.frame += read_audio.nframes;
         if (read_audio.addr.msf.frame >= CD_FRAMES)
