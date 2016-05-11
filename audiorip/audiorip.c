@@ -92,7 +92,13 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    rip_track_to_file(cdrom_fd, addresses[0], "track1.pcm", arguments.verbose);
+    for (int i = 0; i < num_tracks; ++i)
+    {
+        char track_name[32] = {'\0'};
+        snprintf(track_name, sizeof(track_name), "track%d.pcm", i+1);
+        fprintf(stdout, "Processing %s\n", track_name);
+        rip_track_to_file(cdrom_fd, addresses[i], track_name, arguments.verbose);
+    }
 
     free(addresses);
     ioctl(cdrom_fd, CDROMSTOP);
@@ -239,6 +245,10 @@ static int rip_track_to_file(int fd,
         }
 
         fwrite(buffer, (size_t)CD_FRAMESIZE_RAW, (size_t)read_audio.nframes, out);
+        if (verbose)
+        {
+            fprintf(stdout, "%s progress %d/%d\n", filename, chunk, readframes);
+        }
 
         read_audio.addr.msf.frame += read_audio.nframes;
         if (read_audio.addr.msf.frame >= CD_FRAMES)
