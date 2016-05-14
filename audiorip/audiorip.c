@@ -141,5 +141,6 @@ int audiorip_rip_track_to_file(int fd,
             }
         }
     }
+    fclose(out);
     return 0;
 }
