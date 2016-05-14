@@ -32,10 +32,17 @@ int audiorip_get_num_tracks(int fd, int verbose)
     return toc_header.cdth_trk1;
 }
 
+static int msf_to_frames(union cdrom_addr const entry)
+{
+    int seconds = (entry.msf.minute * 60) + entry.msf.second;
+    int frames = (seconds * CD_FRAMES) + entry.msf.frame;
+    return frames - CD_MSF_OFFSET;
+}
+
 int audiorip_get_track_addresses(int fd,
-                        struct track_address* addresses,
-                        int num_tracks,
-                        int verbose)
+                                 struct track_address* addresses,
+                                 int num_tracks,
+                                 int verbose)
 {
     for (int i = 1; i <= num_tracks; ++i)
     {
@@ -70,14 +77,8 @@ int audiorip_get_track_addresses(int fd,
             return -1;
         }
 
-        addresses[i-1].start = current_track.cdte_addr.msf.frame
-                           + (current_track.cdte_addr.msf.minute * CD_FRAMES * 3600)
-                           + (current_track.cdte_addr.msf.second * CD_FRAMES)
-                           - CD_MSF_OFFSET;
-        addresses[i-1].end = next_track.cdte_addr.msf.frame
-                         + (next_track.cdte_addr.msf.minute * CD_FRAMES * 3600)
-                         + (next_track.cdte_addr.msf.second * CD_FRAMES)
-                         - CD_MSF_OFFSET;
+        addresses[i-1].start      = msf_to_frames(current_track.cdte_addr);
+        addresses[i-1].end        = msf_to_frames(next_track.cdte_addr);
         addresses[i-1].cdrom_addr = current_track.cdte_addr;
         if (verbose)
         {
@@ -108,8 +109,12 @@ int audiorip_rip_track_to_file(int fd,
     }
 
     FILE* out = fopen(filename, "wb");
-    for (int chunk = 0; chunk < readframes; chunk += CD_FRAMES)
+    for (int chunk = 0; chunk < readframes; chunk += read_audio.nframes)
     {
+        if ((CD_FRAMES + chunk) > readframes)
+        {
+            read_audio.nframes = readframes - chunk;
+        }
         if (ioctl(fd, CDROMREADAUDIO, &read_audio) < 0)
         {
             fprintf(stderr, "Failed to read chunk\n");
