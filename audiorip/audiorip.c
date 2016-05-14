@@ -96,19 +96,19 @@ int audiorip_get_track_addresses(int fd,
     return 0;
 }
 
-int audiorip_rip_track_to_file(int fd,
-                               struct track_address const address,
-                               char const* filename,
-                               int verbose)
+unsigned char const* audiorip_rip_track(int fd,
+                                        struct track_address const address,
+                                        int verbose)
 {
     int const readframes = address.end - address.start;
-    unsigned char buffer[CD_FRAMES * CD_FRAMESIZE_RAW];
+    unsigned char *buffer = malloc(readframes * CD_FRAMESIZE_RAW);
+    unsigned char interim_buffer[CD_FRAMES * CD_FRAMESIZE_RAW];
     struct cdrom_read_audio read_audio =
     {
         .addr        = address.cdrom_addr,
         .addr_format = CDROM_MSF,
         .nframes     = CD_FRAMES,
-        .buf         = &buffer[0]
+        .buf         = &interim_buffer[0]
     };
 
     if (verbose)
@@ -116,26 +116,28 @@ int audiorip_rip_track_to_file(int fd,
         fprintf(stdout, "Reading track from %d to %d\n", address.start, address.end);
     }
 
-    FILE *const out = fopen(filename, "wb");
     for (int chunk = 0; chunk < readframes; chunk += read_audio.nframes)
     {
         if ((CD_FRAMES + chunk) > readframes)
         {
             read_audio.nframes = readframes - chunk;
         }
+
         if (ioctl(fd, CDROMREADAUDIO, &read_audio) < 0)
         {
             fprintf(stderr, "Failed to read chunk\n");
             fprintf(stderr, "%s\n", strerror(errno));
             audiorip_spindown_and_close(fd);
-            fclose(out);
-            return -1;
+            return NULL;
         }
 
-        fwrite(buffer, (size_t)CD_FRAMESIZE_RAW, (size_t)read_audio.nframes, out);
+        memcpy(buffer + (chunk * CD_FRAMESIZE_RAW),
+               interim_buffer,
+               read_audio.nframes * CD_FRAMESIZE_RAW);
+
         if (verbose)
         {
-            fprintf(stdout, "%s progress %d/%d\n", filename, chunk, readframes);
+            fprintf(stdout, "progress %d/%d\n", chunk, readframes);
         }
 
         read_audio.addr.msf.frame += read_audio.nframes;
@@ -150,6 +152,32 @@ int audiorip_rip_track_to_file(int fd,
             }
         }
     }
+
+    return buffer;
+}
+
+int audiorip_rip_track_to_file(int fd,
+                               struct track_address const address,
+                               char const* filename,
+                               int verbose)
+{
+    FILE *out = fopen(filename, "wb");
+    unsigned char const* track_data = audiorip_rip_track(fd, address, verbose);
+    if (track_data == NULL)
+    {
+        fclose(out);
+        return -1;
+    }
+    fwrite((void const*)track_data,
+           (size_t)CD_FRAMESIZE_RAW,
+           (size_t)(address.end - address.start),
+           out);
     fclose(out);
+    audiorip_free_track(track_data);
     return 0;
+}
+
+void audiorip_free_track(unsigned char const* buffer)
+{
+    free((void*)buffer);
 }
