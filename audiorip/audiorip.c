@@ -40,8 +40,8 @@ static int msf_to_frames(union cdrom_addr const entry)
 }
 
 int audiorip_get_track_addresses(int fd,
-                                 struct track_address* addresses,
-                                 int num_tracks,
+                                 struct track_address *const addresses,
+                                 int const num_tracks,
                                  int verbose)
 {
     for (int i = 1; i <= num_tracks; ++i)
@@ -52,17 +52,24 @@ int audiorip_get_track_addresses(int fd,
             .cdte_format = CDROM_MSF
         };
 
+        if (ioctl(fd, CDROMREADTOCENTRY, &current_track) < 0)
+        {
+            fprintf(stderr, "Failed to read ToC entry for track: %d\n", i);
+            audiorip_spindown_and_close(fd);
+            return -1;
+        }
+
+        /**
+         * In order to ascertain the length of the current track, we need
+         * to know the address of the next track in the list.  Should the
+         * current track be the last one, we simply request the address
+         * of the Leadout track.
+         */
         struct cdrom_tocentry next_track =
         {
             .cdte_track = i == num_tracks ? CDROM_LEADOUT : i+1,
             .cdte_format = CDROM_MSF
         };
-
-        if (ioctl(fd, CDROMREADTOCENTRY, &current_track) < 0)
-        {
-            fprintf(stderr, "Failed to read ToC entry for track: %d\n", i);
-            return -1;
-        }
 
         if (ioctl(fd, CDROMREADTOCENTRY, &next_track) < 0)
         {
@@ -74,6 +81,7 @@ int audiorip_get_track_addresses(int fd,
             {
                 fprintf(stderr, "Failed to read ToC entry for track: %d\n", i+1);
             }
+            audiorip_spindown_and_close(fd);
             return -1;
         }
 
@@ -89,9 +97,9 @@ int audiorip_get_track_addresses(int fd,
 }
 
 int audiorip_rip_track_to_file(int fd,
-                      struct track_address address,
-                      char const* filename,
-                      int verbose)
+                               struct track_address const address,
+                               char const* filename,
+                               int verbose)
 {
     int const readframes = address.end - address.start;
     unsigned char buffer[CD_FRAMES * CD_FRAMESIZE_RAW];
@@ -108,7 +116,7 @@ int audiorip_rip_track_to_file(int fd,
         fprintf(stdout, "Reading track from %d to %d\n", address.start, address.end);
     }
 
-    FILE* out = fopen(filename, "wb");
+    FILE *const out = fopen(filename, "wb");
     for (int chunk = 0; chunk < readframes; chunk += read_audio.nframes)
     {
         if ((CD_FRAMES + chunk) > readframes)
@@ -119,6 +127,7 @@ int audiorip_rip_track_to_file(int fd,
         {
             fprintf(stderr, "Failed to read chunk\n");
             fprintf(stderr, "%s\n", strerror(errno));
+            audiorip_spindown_and_close(fd);
             fclose(out);
             return -1;
         }
