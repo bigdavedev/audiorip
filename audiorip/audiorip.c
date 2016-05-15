@@ -7,6 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <stdint.h>
+
+static void write_wav_header(struct track_address address,
+                             FILE* wav_file);
 
 void audiorip_spindown_and_close(int fd)
 {
@@ -162,6 +166,10 @@ int audiorip_rip_track_to_file(int fd,
                                int verbose)
 {
     FILE *out = fopen(filename, "wb");
+    if (strcmp(strrchr(filename, '.'), ".wav") == 0)
+    {
+        write_wav_header(address, out);
+    }
     unsigned char const* track_data = audiorip_rip_track(fd, address, verbose);
     if (track_data == NULL)
     {
@@ -175,6 +183,42 @@ int audiorip_rip_track_to_file(int fd,
     fclose(out);
     audiorip_free_track(track_data);
     return 0;
+}
+
+static void write_file_little_endian(unsigned int word,
+                                     int num_bytes,
+                                     FILE *wav_file)
+{
+    while (num_bytes > 0)
+    {
+        unsigned buffer = word & 0xff;
+        fwrite(&buffer, 1, 1, wav_file);
+        num_bytes--;
+        word >>= 8;
+    }
+}
+
+static void write_wav_header(struct track_address address,
+                             FILE* wav_file)
+{
+
+    uint32_t const WAV_HEADER_SIZE = 36;
+    uint32_t const DATA_SIZE       = (address.end - address.start)
+                                   * CD_FRAMESIZE_RAW;
+    uint32_t const TOTAL_FILE_SIZE = DATA_SIZE + WAV_HEADER_SIZE;
+    write_file_little_endian(0x46464952,      4, wav_file); /* "RIFF" */
+    write_file_little_endian(TOTAL_FILE_SIZE, 4, wav_file);
+    write_file_little_endian(0x45564157,      4, wav_file); /* "WAVE" */
+    write_file_little_endian(0x20746D66,      4, wav_file); /* "fmt " */
+    write_file_little_endian(16,              4, wav_file); /* subchunk size */
+    write_file_little_endian(1,               2, wav_file); /* PCM format*/
+    write_file_little_endian(2,               2, wav_file); /* Num channels */
+    write_file_little_endian(44100,           4, wav_file); /* Sampling rate */
+    write_file_little_endian(176400,          4, wav_file); /* Byte rate */
+    write_file_little_endian(4,               2, wav_file); /* Block align */
+    write_file_little_endian(16,              2, wav_file); /* Bits/sample */
+    write_file_little_endian(0x61746164,      4, wav_file); /* "data" */
+    write_file_little_endian(DATA_SIZE,       4, wav_file); /* Data size */
 }
 
 void audiorip_free_track(unsigned char const* buffer)

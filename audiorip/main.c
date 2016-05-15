@@ -21,9 +21,10 @@ static char doc[] = "Rip an audio CD to PCM";
 
 static struct argp_option options[] =
 {
-    { "verbose",  'v', 0,       0,  "Produce verbose output" },
-    { "quiet",    'q', 0,       0,  "Don't produce any output" },
-    { "device",   'd', "cdrom", 0,  "Specify which CDROM device to use" },
+    { "verbose",  'v', 0,         0,  "Produce verbose output" },
+    { "quiet",    'q', 0,         0,  "Don't produce any output" },
+    { "device",   'd', "cdrom",   0,  "Specify which CDROM device to use" },
+    { "format",   'f', "WAV|PCM", 0,  "Specify the output file format" },
     { 0 }
 };
 
@@ -32,6 +33,7 @@ struct arguments
     int  verbose;
     int  quiet;
     char *device;
+    char *format;
 };
 static error_t parse_opt (int key, char *arg, struct argp_state *state);
 static struct argp argp = { options, parse_opt, NULL, doc };
@@ -50,6 +52,7 @@ int main(int argc, char* argv[])
     arguments.verbose = 0;
     arguments.quiet   = 0;
     arguments.device  = "/dev/sr0";
+    arguments.format  = "wav";
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
@@ -76,7 +79,7 @@ int main(int argc, char* argv[])
     for (int i = 0; i < num_tracks; ++i)
     {
         char track_name[32] = {'\0'};
-        snprintf(track_name, sizeof(track_name), "track%d.pcm", i+1);
+        snprintf(track_name, sizeof(track_name), "track%d.%s", i+1, arguments.format);
         fprintf(stdout, "Processing %s\n", track_name);
         audiorip_rip_track_to_file(cdrom_fd, addresses[i], track_name, arguments.verbose);
     }
@@ -101,6 +104,13 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
         break;
     case 'd':
         arguments->device = arg;
+        break;
+    case 'f':
+        for (size_t i = 0; arg[i]; ++i)
+        {
+            arg[i] = tolower(arg[i]);
+        }
+        arguments->format = arg;
         break;
     default:
       return ARGP_ERR_UNKNOWN;
