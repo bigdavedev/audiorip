@@ -1,7 +1,5 @@
 #include <audiorip.h>
-
-#include <sys/ioctl.h>
-#include <unistd.h>
+#include <audiorip_cdrom.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,14 +12,14 @@ static void write_wav_header(struct track_address address,
 
 void audiorip_spindown_and_close(int fd)
 {
-    ioctl(fd, CDROMSTOP);
-    close(fd);
+    audiorip_cdrom_spindown(fd);
+    audiorip_cdrom_close(fd);
 }
 
 int audiorip_get_num_tracks(int fd, int verbose)
 {
     struct cdrom_tochdr toc_header;
-    if (ioctl(fd, CDROMREADTOCHDR, &toc_header) < 0)
+    if (audiorip_cdrom_read_toc_header(fd, &toc_header) < 0)
     {
         fprintf(stderr, "Failed to read ToC header\n");
         audiorip_spindown_and_close(fd);
@@ -56,7 +54,7 @@ int audiorip_get_track_addresses(int fd,
             .cdte_format = CDROM_MSF
         };
 
-        if (ioctl(fd, CDROMREADTOCENTRY, &current_track) < 0)
+        if (audiorip_cdrom_read_toc_entry(fd, &current_track) < 0)
         {
             fprintf(stderr, "Failed to read ToC entry for track: %d\n", i);
             audiorip_spindown_and_close(fd);
@@ -75,7 +73,7 @@ int audiorip_get_track_addresses(int fd,
             .cdte_format = CDROM_MSF
         };
 
-        if (ioctl(fd, CDROMREADTOCENTRY, &next_track) < 0)
+        if (audiorip_cdrom_read_toc_entry(fd, &next_track) < 0)
         {
             if (next_track.cdte_track == CDROM_LEADOUT)
             {
@@ -127,7 +125,7 @@ unsigned char const* audiorip_rip_track(int fd,
             read_audio.nframes = readframes - chunk;
         }
 
-        if (ioctl(fd, CDROMREADAUDIO, &read_audio) < 0)
+        if (audiorip_cdrom_read_audio(fd, &read_audio) < 0)
         {
             fprintf(stderr, "Failed to read chunk\n");
             fprintf(stderr, "%s\n", strerror(errno));

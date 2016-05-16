@@ -1,14 +1,10 @@
-#include <fcntl.h>
-#include <unistd.h>
-
-#include <sys/ioctl.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
 
 #include <audiorip.h>
+#include <audiorip_cdrom.h>
 
 /**
  * Stuff for argp
@@ -56,14 +52,14 @@ int main(int argc, char* argv[])
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-    cdrom_fd = open((char const*)arguments.device, O_RDONLY | O_NONBLOCK);
+    cdrom_fd = audiorip_cdrom_open((char const*)arguments.device);
     if (cdrom_fd < 0)
     {
         fprintf(stderr, "Failed to open CDROM\n");
         return -1;
     }
 
-    ioctl(cdrom_fd, CDROMSTART);
+    audiorip_cdrom_spinup(cdrom_fd);
 
     /* Get table of contents header to determine number of tracks */
     int num_tracks = audiorip_get_num_tracks(cdrom_fd, arguments.verbose);
@@ -85,8 +81,7 @@ int main(int argc, char* argv[])
     }
 
     free(addresses);
-    ioctl(cdrom_fd, CDROMSTOP);
-    close(cdrom_fd);
+    audiorip_spindown_and_close(cdrom_fd);
     return 0;
 }
 
@@ -121,7 +116,6 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 
 static void sigint_handler(int sig)
 {
-    ioctl(cdrom_fd, CDROMSTOP);
-    close(cdrom_fd);
+    audiorip_spindown_and_close(cdrom_fd);
     exit(sig);
 }
