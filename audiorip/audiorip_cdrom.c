@@ -1,12 +1,12 @@
 #include <audiorip_cdrom.h>
 
-#include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 
-#include <sys/ioctl.h>
-#include <linux/cdrom.h>
 #include <fcntl.h>
+#include <linux/cdrom.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 int audiorip_cdrom_open(char const* device)

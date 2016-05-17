@@ -1,22 +1,21 @@
 #include <fcntl.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
 #include <linux/cdrom.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 #include <argp.h>
 #include <stdio.h>
 
-const char *argp_program_version = "0.1";
-const char *argp_program_bug_address = "<d.brown@bigdavedev.com>";
-static char doc[] = "Spin down the CDROM device";
+const char* argp_program_version     = "0.1";
+const char* argp_program_bug_address = "<d.brown@bigdavedev.com>";
+static char doc[]                    = "Spin down the CDROM device";
 
-static struct argp_option options[] =
-{
-    { "device",   'd', "cdrom", 0,  "Specify which CDROM device to use" },
+static struct argp_option options[] = {
+    { "device", 'd', "cdrom", 0, "Specify which CDROM device to use" },
     { 0 }
 };
 
-static error_t parse_opt (int key, char *arg, struct argp_state *state);
+static error_t parse_opt(int key, char* arg, struct argp_state* state);
 static struct argp argp = { options, parse_opt, NULL, doc };
 
 static char* device = NULL;
@@ -37,9 +36,9 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-static error_t parse_opt (int key, char *arg, struct argp_state *state)
+static error_t parse_opt(int key, char* arg, struct argp_state* state)
 {
-    char *device = state->input;
+    char* device = state->input;
 
     switch (key)
     {
@@ -47,7 +46,7 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
         device = arg;
         break;
     default:
-      return ARGP_ERR_UNKNOWN;
+        return ARGP_ERR_UNKNOWN;
     }
 
     return 0;
